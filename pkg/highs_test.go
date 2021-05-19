@@ -27,12 +27,12 @@ func TestAddCols(t *testing.T) {
 }
 
 func TestPackRows(t *testing.T) {
-	rows := [][]float64{{0.0, 1.0}, {1.0, 2.0}, {2.0, 1.0}}
-	arStart, arIndex, arValue := packRows(rows)
+	matrix := [][]float64{{0.0, 1.0}, {1.0, 2.0}, {2.0, 1.0}}
+	pm := packMatrix(matrix)
 
-	assert.Equal(t, []int{0, 1, 3}, arStart, "malformed start index slice")
-	assert.Equal(t, []int{1, 0, 1, 0, 1}, arIndex, "malformed decision variable index slice")
-	assert.Equal(t, []float64{1.0, 1.0, 2.0, 2.0, 1.0}, arValue, "malformed decision variable coefficient slice")
+	assert.Equal(t, []int{0, 1, 3}, pm.arStart, "malformed start index slice")
+	assert.Equal(t, []int{1, 0, 1, 0, 1}, pm.arIndex, "malformed decision variable index slice")
+	assert.Equal(t, []float64{1.0, 1.0, 2.0, 2.0, 1.0}, pm.arValue, "malformed decision variable coefficient slice")
 }
 
 func TestAddRowsWithoutCols(t *testing.T) {
@@ -85,4 +85,7 @@ func TestRun(t *testing.T) {
 	assert.Nil(t, err, "Error returned when adding columns to highs object")
 
 	h.Run()
+	s := h.GetSolution()
+
+	t.Log(s)
 }

@@ -11,16 +11,23 @@ import (
 	"unsafe"
 )
 
+type Dims struct {
+	rows int
+	cols int
+}
+
 type Highs struct {
 	obj    unsafe.Pointer
 	allocs []unsafe.Pointer
+	dims   Dims
 }
 
-// NewHighsObj returns an allocated Highs object
+// New returns an allocated Highs object
 func New() (*Highs, error) {
 	highs := &Highs{
 		obj:    C.Highs_create(),
 		allocs: make([]unsafe.Pointer, 0, 64),
+		dims:   Dims{0, 0},
 	}
 
 	// TODO: how to check for a bad malloc?
@@ -40,26 +47,26 @@ func (h *Highs) Destroy() {
 }
 
 func (h *Highs) AddColumns(cols []float64, lb []float64, ub []float64) error {
-	n := len(cols)
-	if n != len(lb) || n != len(ub) {
+	h.dims.cols = len(cols)
+	if h.dims.cols != len(lb) || h.dims.cols != len(ub) {
 		return errors.New("all slice parameters must be equal length.")
 	}
 
-	pCols := cMalloc(n, C.double(0))
+	pCols := cMalloc(h.dims.cols, C.double(0))
 	h.allocs = append(h.allocs, pCols)
 	cSetArrayDoubles(pCols, cols)
 
-	pLb := cMalloc(n, C.double(0))
+	pLb := cMalloc(h.dims.cols, C.double(0))
 	h.allocs = append(h.allocs, pLb)
 	cSetArrayDoubles(pLb, lb)
 
-	pUb := cMalloc(n, C.double(0))
+	pUb := cMalloc(h.dims.cols, C.double(0))
 	h.allocs = append(h.allocs, pUb)
 	cSetArrayDoubles(pUb, ub)
 
 	err := C.Highs_addCols(
 		h.obj,
-		C.int(n),
+		C.int(h.dims.cols),
 		(*C.double)(pCols),
 		(*C.double)(pLb),
 		(*C.double)(pUb),
@@ -76,39 +83,39 @@ func (h *Highs) AddColumns(cols []float64, lb []float64, ub []float64) error {
 }
 
 func (h *Highs) AddRows(rows [][]float64, lb []float64, ub []float64) error {
-	n := len(rows)
-	if n != len(lb) || n != len(ub) {
+	h.dims.rows = len(rows)
+	if h.dims.rows != len(lb) || h.dims.rows != len(ub) {
 		return errors.New("an upper and lower bound must be specified for all rows, len(row[0]) != len(ub) or len(lb)")
 	}
 
-	arStart, arIndex, arValue := packRows(rows)
+	pm := packMatrix(rows)
 
-	pArStart := cMalloc(len(arStart), C.int(0))
+	pArStart := cMalloc(len(pm.arStart), C.int(0))
 	h.allocs = append(h.allocs, pArStart)
-	cSetArrayInts(pArStart, arStart)
+	cSetArrayInts(pArStart, pm.arStart)
 
-	pArIndex := cMalloc(len(arIndex), C.int(0))
+	pArIndex := cMalloc(len(pm.arIndex), C.int(0))
 	h.allocs = append(h.allocs, pArIndex)
-	cSetArrayInts(pArIndex, arIndex)
+	cSetArrayInts(pArIndex, pm.arIndex)
 
-	pArValue := cMalloc(len(arValue), C.double(0))
+	pArValue := cMalloc(len(pm.arValue), C.double(0))
 	h.allocs = append(h.allocs, pArValue)
-	cSetArrayDoubles(pArValue, arValue)
+	cSetArrayDoubles(pArValue, pm.arValue)
 
-	pLb := cMalloc(n, C.double(0))
+	pLb := cMalloc(h.dims.rows, C.double(0))
 	h.allocs = append(h.allocs, pLb)
 	cSetArrayDoubles(pLb, lb)
 
-	pUb := cMalloc(n, C.double(0))
+	pUb := cMalloc(h.dims.rows, C.double(0))
 	h.allocs = append(h.allocs, pUb)
 	cSetArrayDoubles(pUb, ub)
 
 	err := C.Highs_addRows(
 		h.obj,
-		C.int(n),
+		C.int(h.dims.rows),
 		(*C.double)(pLb),
 		(*C.double)(pUb),
-		C.int(len(arIndex)),
+		C.int(len(pm.arIndex)),
 		(*C.int)(pArStart),
 		(*C.int)(pArIndex),
 		(*C.double)(pArValue))
@@ -122,18 +129,58 @@ func (h *Highs) AddRows(rows [][]float64, lb []float64, ub []float64) error {
 
 func (h *Highs) Run() error {
 	C.Highs_run(h.obj)
-
 	return nil
 }
 
+type Solution struct {
+	colValue []float64
+	colDual  []float64
+	rowValue []float64
+	rowDual  []float64
+}
+
+func NewSolution() Solution {
+	return Solution{[]float64{}, []float64{}, []float64{}, []float64{}}
+}
+
+func (h *Highs) GetSolution() Solution {
+	pColValue := cMalloc(h.dims.cols, C.double(0))
+	h.allocs = append(h.allocs, pColValue)
+
+	pColDual := cMalloc(h.dims.cols, C.double(0))
+	h.allocs = append(h.allocs, pColDual)
+
+	pRowValue := cMalloc(h.dims.rows, C.double(0))
+	h.allocs = append(h.allocs, pRowValue)
+
+	pRowDual := cMalloc(h.dims.rows, C.double(0))
+	h.allocs = append(h.allocs, pRowDual)
+
+	C.Highs_getSolution(h.obj, (*C.double)(pColValue), (*C.double)(pColDual), (*C.double)(pRowValue), (*C.double)(pRowDual))
+
+	s := NewSolution()
+	s.colValue = copyDoubles(pColValue, h.dims.cols)
+	s.colDual = copyDoubles(pColDual, h.dims.cols)
+	s.rowValue = copyDoubles(pRowValue, h.dims.rows)
+	s.rowDual = copyDoubles(pRowDual, h.dims.rows)
+
+	return s
+}
+
+type PackedMatrix struct {
+	arStart []int
+	arIndex []int
+	arValue []float64
+}
+
 // packRows returns the rows in a flat packed form use in the HiGHS c interface
-func packRows(rows [][]float64) ([]int, []int, []float64) {
+func packMatrix(matrix [][]float64) PackedMatrix {
 	arStart := []int{}
 	arIndex := []int{}
 	arValue := []float64{}
 
 	idx := 0
-	for _, cols := range rows {
+	for _, cols := range matrix {
 		arStart = append(arStart, idx)
 		for i, v := range cols {
 			if v != 0 {
@@ -144,7 +191,7 @@ func packRows(rows [][]float64) ([]int, []int, []float64) {
 		idx = len(arIndex)
 	}
 
-	return arStart, arIndex, arValue
+	return PackedMatrix{arStart, arIndex, arValue}
 }
 
 /*
@@ -222,7 +269,14 @@ func cSetArrayDouble(a unsafe.Pointer, i int, v float64) {
 	*(*C.double)(ptr) = C.double(v)
 }
 
-/*
+func copyDoubles(a unsafe.Pointer, size int) []float64 {
+	gs := make([]float64, size)
+	for i, _ := range gs {
+		gs[i] = cGetArrayDouble(a, i)
+	}
+
+	return gs
+}
 
 // cGetArrayDouble returns a[i] as a Go float64 where a is a C.double array
 // allocated by cMalloc and i is an int.
@@ -232,6 +286,7 @@ func cGetArrayDouble(a unsafe.Pointer, i int) float64 {
 	return float64(*(*C.double)(ptr))
 }
 
+/*
 // copyIntsGoC copies a slice of Go ints to a slice of C ints.
 func copyIntsGoC(cs []C.int, gs []int) {
 	if len(gs) != len(cs) {
