@@ -2,11 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "call_highs.h"
-
-int first(int x) {
-  return x;
-}
+#include "highs-interface.h"
 
 void minimal_api() {
   const int numcol = 2;

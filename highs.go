@@ -1,8 +1,7 @@
 package main
 
-// #cgo CFLAGS: -I/usr/lib/
-// #cgo LDFLAGS: -L/usr/lib/ -lstdc++ -lhighs
-// #include "call_highs.h"
+// #cgo pkg-config: highs
+// #include "highs-interface.h"
 import "C"
 
 func main() {
