@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "call_highs.hpp"
+#include "call_highs.h"
 
 int first(int x) {
   return x;
