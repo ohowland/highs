@@ -8,9 +8,8 @@ extern "C" {
 #endif
 
     // opaque pointer to c++ highs object
-    typedef void* highs_obj;
+    typedef char highs_obj;
 
-    //
     extern highs_obj* highsiface_create();
     extern void highsiface_free(highs_obj* highs);
     extern HighsInt highsiface_add_cols(highs_obj* highs, HighsInt numCol, double* colCost, double* colLower, double* colUpper);

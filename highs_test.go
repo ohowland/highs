@@ -8,14 +8,14 @@ import (
 
 func TestCreateHighs(t *testing.T) {
 	h, err := New()
-	defer h.Free()
+	defer h.Destroy()
 
 	assert.Nil(t, err, "Error returned when allocating new highs object.")
 }
 
 func TestAddCols(t *testing.T) {
 	h, _ := New()
-	defer h.Free()
+	defer h.Destroy()
 
 	cost := []float64{2.0, 3.0}
 	lb := []float64{0.0, 1.0}
@@ -37,7 +37,7 @@ func TestPackRows(t *testing.T) {
 
 func TestAddRowsWithoutCols(t *testing.T) {
 	h, _ := New()
-	defer h.Free()
+	defer h.Destroy()
 
 	rows := [][]float64{{0.0, 1.0}, {1.0, 2.0}, {2.0, 1.0}}
 	lb := []float64{-10e30, 10.0, 8}
@@ -49,7 +49,7 @@ func TestAddRowsWithoutCols(t *testing.T) {
 
 func TestAddColsAndRows(t *testing.T) {
 	h, _ := New()
-	defer h.Free()
+	defer h.Destroy()
 
 	cost := []float64{2.0, 3.0}
 	lb := []float64{0.0, 1.0}
@@ -68,7 +68,7 @@ func TestAddColsAndRows(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	h, _ := New()
-	defer h.Free()
+	defer h.Destroy()
 
 	cost := []float64{2.0, 3.0}
 	lb := []float64{0.0, 1.0}

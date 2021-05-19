@@ -2,7 +2,7 @@ package highs
 
 // #cgo pkg-config: highs
 // #include <stdlib.h>
-// #include "highs-interface.h"
+// #include "interfaces/highs_c_api.h"
 import "C"
 import (
 	"errors"
@@ -12,14 +12,14 @@ import (
 )
 
 type Highs struct {
-	matrix *C.highs_obj
+	obj    unsafe.Pointer
 	allocs []unsafe.Pointer
 }
 
 // NewHighsObj returns an allocated Highs object
 func New() (*Highs, error) {
 	highs := &Highs{
-		matrix: C.highsiface_create(),
+		obj:    C.Highs_create(),
 		allocs: make([]unsafe.Pointer, 0, 64),
 	}
 
@@ -27,10 +27,10 @@ func New() (*Highs, error) {
 	return highs, nil
 }
 
-func (h *Highs) Free() {
-	if h.matrix != nil {
-		C.highsiface_free(h.matrix)
-		h.matrix = nil
+func (h *Highs) Destroy() {
+	if h.obj != nil {
+		C.Highs_destroy(h.obj)
+		h.obj = nil
 
 		for _, p := range h.allocs {
 			cFree(p)
@@ -57,12 +57,16 @@ func (h *Highs) AddColumns(cols []float64, lb []float64, ub []float64) error {
 	h.allocs = append(h.allocs, pUb)
 	cSetArrayDoubles(pUb, ub)
 
-	err := C.highsiface_add_cols(
-		h.matrix,
+	err := C.Highs_addCols(
+		h.obj,
 		C.int(n),
 		(*C.double)(pCols),
 		(*C.double)(pLb),
-		(*C.double)(pUb))
+		(*C.double)(pUb),
+		C.int(0),
+		nil,
+		nil,
+		nil)
 
 	if err == 0 {
 		return errors.New(fmt.Sprintf("unable to add columns; returned error: %d", err))
@@ -99,8 +103,8 @@ func (h *Highs) AddRows(rows [][]float64, lb []float64, ub []float64) error {
 	h.allocs = append(h.allocs, pUb)
 	cSetArrayDoubles(pUb, ub)
 
-	err := C.highsiface_add_rows(
-		h.matrix,
+	err := C.Highs_addRows(
+		h.obj,
 		C.int(n),
 		(*C.double)(pLb),
 		(*C.double)(pUb),
@@ -117,7 +121,7 @@ func (h *Highs) AddRows(rows [][]float64, lb []float64, ub []float64) error {
 }
 
 func (h *Highs) Run() error {
-	C.highsiface_run(h.matrix)
+	C.Highs_run(h.obj)
 
 	return nil
 }
