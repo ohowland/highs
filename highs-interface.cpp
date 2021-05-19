@@ -1,9 +1,40 @@
-#include "interfaces/highs_c_api.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include "highs-interface.h"
 
+extern "C" {
+  highs_obj* highsiface_create(void) {
+    void* highs = Highs_create();
+    return (highs_obj*)highs;
+  }
+
+  extern void highsiface_free(highs_obj* highs) {
+    delete (highs_obj*)highs;
+  }
+
+  extern HighsInt highsiface_add_cols(highs_obj* highs, HighsInt numCol, double* colCost, double* colLower, double* colUpper) {
+    HighsInt r = Highs_addCols(highs, numCol, colCost, colLower, colUpper, 0, NULL, NULL, NULL);
+    return r;
+  }
+  
+  extern HighsInt highsiface_add_rows(highs_obj* highs, HighsInt numRow, double* rowLower, double* rowUpper, HighsInt numNz, HighsInt* arStart, HighsInt* arIndex, double* arValue) {
+    HighsInt r = Highs_addRows(highs, numRow, rowLower, rowUpper, numNz, arStart, arIndex, arValue);
+    return r;
+  }
+
+  extern HighsInt highsiface_run(highs_obj* highs) {
+    Highs_setBoolOptionValue(highs, "output_flag", 1); // for testing run loudly
+    HighsInt r = Highs_run(highs);
+    return r;
+  }
+
+  extern void highsiface_get_solution(highs_obj* highs, double* colValue, double* colDual, double* rowValue, double* rowDual) {
+    Highs_getSolution(highs, colValue, colDual, rowValue, rowDual);
+  }
+}
+
+/*
 void full_api() {
   // Form and solve the LP
   // Min    f  = 2x_0 + 3x_1
@@ -150,3 +181,5 @@ void full_api() {
   printf("Iteration count = %d\n", iteration_count);
   Highs_destroy(highs);
 }
+
+*/
