@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-    void minimal_api();
+    void full_api();
 
 #ifdef __cplusplus
 }

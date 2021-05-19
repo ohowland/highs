@@ -5,5 +5,5 @@ package main
 import "C"
 
 func main() {
-	C.minimal_api()
+	C.full_api()
 }
