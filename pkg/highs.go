@@ -160,9 +160,16 @@ func (h *Highs) GetSolution() Solution {
 
 	s := NewSolution()
 	s.colValue = copyDoubles(pColValue, h.dims.cols)
+	cFree(pColValue)
+
 	s.colDual = copyDoubles(pColDual, h.dims.cols)
+	cFree(pColDual)
+
 	s.rowValue = copyDoubles(pRowValue, h.dims.rows)
+	cFree(pRowValue)
+
 	s.rowDual = copyDoubles(pRowDual, h.dims.rows)
+	cFree(pRowDual)
 
 	return s
 }
@@ -194,24 +201,6 @@ func packMatrix(matrix [][]float64) PackedMatrix {
 	return PackedMatrix{arStart, arIndex, arValue}
 }
 
-/*
-// A Nonzero represents an element in a sparse row or column.
-type Nonzero struct {
-	Index int     // Zero-based element offset
-	Value float64 // Value at that offset
-}
-
-// A Matrix sparsely represents a set of linear expressions.  Each column
-// represents a variable, each row represents an expression, and each cell
-// containing a coefficient. Bounds on rows and columns are applied during
-// model initialization.
-type Matrix interface {
-	AppendColumn(col []Nonzero) // Append a column given values for all of its nonzero elements
-	Dims() (rows, cols int)     // Return the matrix's dimensions
-}
-
-*/
-
 // cMalloc asks C to allocate memory.  For convenience to Go, the arguments
 // are like calloc's except that the size argument is a value, which cMalloc
 // will take the size of.  cMalloc panics on error (typically, out of memory).
@@ -242,18 +231,6 @@ func cSetArrayInt(a unsafe.Pointer, i, v int) {
 	ptr := unsafe.Pointer(uintptr(a) + uintptr(i)*eSize)
 	*(*C.int)(ptr) = C.int(v)
 }
-
-/*
-
-// c__GetArrayInt returns a[i] as a Go int where a is a C.int array allocated
-// by cMalloc and i is a Go ints.
-func cGetArrayInt(a unsafe.Pointer, i int) int {
-	eSize := unsafe.Sizeof(C.int(0))
-	ptr := unsafe.Pointer(uintptr(a) + uintptr(i)*eSize)
-	return int(*(*C.int)(ptr))
-}
-
-*/
 
 func cSetArrayDoubles(a unsafe.Pointer, vs []float64) {
 	for i, v := range vs {
@@ -287,6 +264,30 @@ func cGetArrayDouble(a unsafe.Pointer, i int) float64 {
 }
 
 /*
+// A Nonzero represents an element in a sparse row or column.
+type Nonzero struct {
+	Index int     // Zero-based element offset
+	Value float64 // Value at that offset
+}
+
+// A Matrix sparsely represents a set of linear expressions.  Each column
+// represents a variable, each row represents an expression, and each cell
+// containing a coefficient. Bounds on rows and columns are applied during
+// model initialization.
+type Matrix interface {
+	AppendColumn(col []Nonzero) // Append a column given values for all of its nonzero elements
+	Dims() (rows, cols int)     // Return the matrix's dimensions
+}
+
+
+// c__GetArrayInt returns a[i] as a Go int where a is a C.int array allocated
+// by cMalloc and i is a Go ints.
+func cGetArrayInt(a unsafe.Pointer, i int) int {
+	eSize := unsafe.Sizeof(C.int(0))
+	ptr := unsafe.Pointer(uintptr(a) + uintptr(i)*eSize)
+	return int(*(*C.int)(ptr))
+}
+
 // copyIntsGoC copies a slice of Go ints to a slice of C ints.
 func copyIntsGoC(cs []C.int, gs []int) {
 	if len(gs) != len(cs) {
@@ -306,4 +307,5 @@ func copyIntsCGo(gs []int, cs []C.int) {
 		gs[i] = int(c)
 	}
 }
+
 */

@@ -6,6 +6,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type Sense int
+
+const (
+	Minimize Sense = iota
+	Maximize
+)
+
+type BooleanOption int
+
+const 
+
 func TestCreateHighs(t *testing.T) {
 	h, err := New()
 	defer h.Destroy()
@@ -87,5 +98,85 @@ func TestRun(t *testing.T) {
 	h.Run()
 	s := h.GetSolution()
 
-	t.Log(s)
+	assert.Equal(t, []float64{2, 4}, s.colValue, "unexpected primal solution")
+}
+
+// SET option
+
+func TestSetBoolOptionValue(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestSetIntOptionValue(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestSetDoubleOptionValue(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestSetStringOptionValue(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestSetOptionValue(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+// GET option
+
+func TestGetBoolOptionValue(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestGetIntOptionValue(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestGetDoubleOptionValue(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestGetStringOptionValue(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestGetOptionType(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+// Objective Sense
+
+func TestChangeObjectiveSense(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestGetObjectiveSense(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+// Integrality
+
+func TestChangeColIntegrality(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestChangeColIntegralityByMask(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestGetIntInfoValue(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestGetDoubleInfoValue(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestGetBasis(t *testing.T) {
+	assert.Fail(t, "unimplemented")
+}
+
+func TestGetModelStatus(t *testing.T) {
+	assert.Fail(t, "unimplemented")
 }
