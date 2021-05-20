@@ -2,20 +2,22 @@ package highs
 
 // #cgo pkg-config: highs
 // #include <stdlib.h>
+// #include <stdio.h>
 // #include "interfaces/highs_c_api.h"
 import "C"
 import (
 	"errors"
 	"fmt"
 	"reflect"
+	"runtime"
 	"unsafe"
 )
 
 type Sense int
 
 const (
-	Minimize Sense = iota
-	Maximize
+	Minimize Sense = -1
+	Maximize Sense = 1
 )
 
 type Integrality int
@@ -38,17 +40,21 @@ type Highs struct {
 
 // New returns an allocated Highs object
 func New() (*Highs, error) {
-	highs := &Highs{
+	h := &Highs{
 		obj:    C.Highs_create(),
 		allocs: make([]unsafe.Pointer, 0, 64),
 		dims:   Dims{0, 0},
 	}
 
+	runtime.SetFinalizer(h, func(h *Highs) {
+		h.destroy()
+	})
+
 	// TODO: how to check for a bad malloc?
-	return highs, nil
+	return h, nil
 }
 
-func (h *Highs) Destroy() {
+func (h *Highs) destroy() {
 	if h.obj != nil {
 		C.Highs_destroy(h.obj)
 		h.obj = nil
@@ -145,8 +151,39 @@ func (h *Highs) SetObjectiveSense(s Sense) {
 	C.Highs_changeObjectiveSense(h.obj, C.int(s))
 }
 
+func (h *Highs) GetObjectiveSense() Sense {
+	pS := cMalloc(1, C.int(0))
+	h.allocs = append(h.allocs, pS)
+	C.Highs_getObjectiveSense(h.obj, (*C.int)(pS))
+
+	return (Sense)(int(*(*C.int)(pS)))
+}
+
 func (h *Highs) SetIntegrality(col int, i Integrality) {
-	C.Highs_changeColIntegrality(h.obj, C.int(col), C.int(i))
+	_ = C.Highs_changeColIntegrality(h.obj, C.int(col), C.int(i))
+}
+
+func (h *Highs) SetStringOptionValue(opt string, val string) {
+
+	pOpt := C.CString(opt)
+	defer cFree(unsafe.Pointer(pOpt))
+
+	pVal := C.CString(val)
+	defer cFree(unsafe.Pointer(pVal))
+
+	C.Highs_setStringOptionValue(h.obj, pOpt, pVal)
+}
+
+func (h *Highs) GetStringOptionValue(opt string) string {
+	pOpt := C.CString(opt)
+	defer cFree(unsafe.Pointer(pOpt))
+
+	pVal := cMalloc(1024, C.char('A'))
+	defer cFree(pVal)
+
+	C.Highs_getStringOptionValue(h.obj, pOpt, (*C.char)(pVal))
+
+	return C.GoString((*C.char)(pVal))
 }
 
 func (h *Highs) Run() error {

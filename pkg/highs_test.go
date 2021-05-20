@@ -28,15 +28,12 @@ func BuildExampleHighs(t *testing.T) *Highs {
 }
 
 func TestCreateHighs(t *testing.T) {
-	h, err := New()
-	defer h.Destroy()
-
+	_, err := New()
 	assert.Nil(t, err, "Error returned when allocating new highs object.")
 }
 
 func TestAddCols(t *testing.T) {
 	h, _ := New()
-	defer h.Destroy()
 
 	cost := []float64{2.0, 3.0}
 	lb := []float64{0.0, 1.0}
@@ -58,7 +55,6 @@ func TestPackRows(t *testing.T) {
 
 func TestAddRowsWithoutCols(t *testing.T) {
 	h, _ := New()
-	defer h.Destroy()
 
 	rows := [][]float64{{0.0, 1.0}, {1.0, 2.0}, {2.0, 1.0}}
 	lb := []float64{-10e30, 10.0, 8}
@@ -70,7 +66,6 @@ func TestAddRowsWithoutCols(t *testing.T) {
 
 func TestAddColsAndRows(t *testing.T) {
 	h, _ := New()
-	defer h.Destroy()
 
 	cost := []float64{2.0, 3.0}
 	lb := []float64{0.0, 1.0}
@@ -89,7 +84,6 @@ func TestAddColsAndRows(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	h, _ := New()
-	defer h.Destroy()
 
 	cost := []float64{2.0, 3.0}
 	lb := []float64{0.0, 1.0}
@@ -130,7 +124,15 @@ func TestSetStringOptionValue(t *testing.T) {
 }
 
 func TestSetOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
+	h, _ := New()
+	opt := "solver"
+	val := "ipm"
+	h.SetStringOptionValue(opt, val)
+
+	r := h.GetStringOptionValue(opt)
+
+	assert.Equal(t, val, r, "value written to option was not returned")
+
 }
 
 // GET option
@@ -148,29 +150,31 @@ func TestGetDoubleOptionValue(t *testing.T) {
 }
 
 func TestGetStringOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
 
-func TestGetOptionType(t *testing.T) {
 	assert.Fail(t, "unimplemented")
 }
 
 // Objective Sense
 
 func TestChangeObjectiveSense(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
+	h := BuildExampleHighs(t)
 
-func TestGetObjectiveSense(t *testing.T) {
-	assert.Fail(t, "unimplemented")
+	h.SetObjectiveSense(Minimize)
+	s := h.GetObjectiveSense()
+	assert.Equal(t, Minimize, s, "sense is not Minimize")
+
+	h.SetObjectiveSense(Maximize)
+	s = h.GetObjectiveSense()
+	assert.Equal(t, Maximize, s, "sense is not Maximize")
+
 }
 
 // Integrality
 
 func TestChangeColIntegrality(t *testing.T) {
 	h := BuildExampleHighs(t)
-	defer h.Destroy()
 	h.SetIntegrality(0, Discrete)
+	assert.Fail(t, "unimplemented")
 }
 
 func TestChangeColIntegralityByMask(t *testing.T) {
