@@ -11,6 +11,20 @@ import (
 	"unsafe"
 )
 
+type Sense int
+
+const (
+	Minimize Sense = iota
+	Maximize
+)
+
+type Integrality int
+
+const (
+	Continious Integrality = iota
+	Discrete
+)
+
 type Dims struct {
 	rows int
 	cols int
@@ -121,10 +135,18 @@ func (h *Highs) AddRows(rows [][]float64, lb []float64, ub []float64) error {
 		(*C.double)(pArValue))
 
 	if err == 0 {
-		return errors.New(fmt.Sprintf("unable to add rows; returned error: %d", err))
+		return fmt.Errorf("unable to add rows; returned error: %d", err)
 	}
 
 	return nil
+}
+
+func (h *Highs) SetObjectiveSense(s Sense) {
+	C.Highs_changeObjectiveSense(h.obj, C.int(s))
+}
+
+func (h *Highs) SetIntegrality(col int, i Integrality) {
+	C.Highs_changeColIntegrality(h.obj, C.int(col), C.int(i))
 }
 
 func (h *Highs) Run() error {
@@ -248,7 +270,7 @@ func cSetArrayDouble(a unsafe.Pointer, i int, v float64) {
 
 func copyDoubles(a unsafe.Pointer, size int) []float64 {
 	gs := make([]float64, size)
-	for i, _ := range gs {
+	for i := range gs {
 		gs[i] = cGetArrayDouble(a, i)
 	}
 

@@ -6,16 +6,26 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type Sense int
+func BuildExampleHighs(t *testing.T) *Highs {
+	h, err := New()
+	assert.NoError(t, err)
 
-const (
-	Minimize Sense = iota
-	Maximize
-)
+	cost := []float64{2.0, 3.0}
+	clb := []float64{0.0, 1.0}
+	cub := []float64{3.0, 1e30}
 
-type BooleanOption int
+	err = h.AddColumns(cost, clb, cub)
+	assert.NoError(t, err)
 
-const 
+	rows := [][]float64{{0.0, 1.0}, {1.0, 2.0}, {2.0, 1.0}}
+	rlb := []float64{-1e30, 10.0, 8}
+	rub := []float64{6.0, 14.0, 1e30}
+
+	err = h.AddRows(rows, rlb, rub)
+	assert.NoError(t, err)
+
+	return h
+}
 
 func TestCreateHighs(t *testing.T) {
 	h, err := New()
@@ -158,22 +168,12 @@ func TestGetObjectiveSense(t *testing.T) {
 // Integrality
 
 func TestChangeColIntegrality(t *testing.T) {
-	assert.Fail(t, "unimplemented")
+	h := BuildExampleHighs(t)
+	defer h.Destroy()
+	h.SetIntegrality(0, Discrete)
 }
 
 func TestChangeColIntegralityByMask(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
-
-func TestGetIntInfoValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
-
-func TestGetDoubleInfoValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
-
-func TestGetBasis(t *testing.T) {
 	assert.Fail(t, "unimplemented")
 }
 
