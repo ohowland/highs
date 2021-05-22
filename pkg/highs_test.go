@@ -6,6 +6,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func BuildExampleMipHighs(t *testing.T) *Highs {
+	h, err := New()
+	assert.NoError(t, err)
+
+	cost := []float64{2.0, 3.0}
+	clb := []float64{0.0, 1.0}
+	cub := []float64{3.0, 1e30}
+
+	err = h.AddColumns(cost, clb, cub)
+	assert.NoError(t, err)
+
+	h.SetIntegrality(1, 0)
+
+	return h
+}
+
 func BuildExampleHighs(t *testing.T) *Highs {
 	h, err := New()
 	assert.NoError(t, err)
@@ -126,7 +142,7 @@ func TestSetStringOptionValue(t *testing.T) {
 func TestSetOptionValue(t *testing.T) {
 	h, _ := New()
 	opt := "solver"
-	val := "ipm"
+	val := "mip"
 	h.SetStringOptionValue(opt, val)
 
 	r := h.GetStringOptionValue(opt)
@@ -172,8 +188,9 @@ func TestChangeObjectiveSense(t *testing.T) {
 // Integrality
 
 func TestChangeColIntegrality(t *testing.T) {
-	h := BuildExampleHighs(t)
-	h.SetIntegrality(0, Discrete)
+	//h := BuildExampleHighs(t)
+	//h.SetIntegrality(0, Discrete)
+	BuildExampleMipHighs(t)
 	assert.Fail(t, "unimplemented")
 }
 

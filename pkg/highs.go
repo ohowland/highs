@@ -13,6 +13,35 @@ import (
 	"unsafe"
 )
 
+type ModelStatus int
+
+const (
+	Notset ModelStatus = iota
+	LoadError
+	ModelError
+	PresolveError
+	SolveError
+	PostsolveError
+	ModelEmpty
+	Optimal
+	Infeasible
+	UnboundedOrInfeasible
+	Unbounded
+	ObjectiveBound
+	ObjectiveTarget
+	TimeLimit
+	IterationLimit
+	Unknown
+)
+
+type SolutionStatus int
+
+const (
+	kSolutionStatusNone SolutionStatus = iota
+	kSolutionStatusInfeasible
+	kSolutionStatusFeasible
+)
+
 type Sense int
 
 const (
@@ -24,7 +53,8 @@ type Integrality int
 
 const (
 	Continious Integrality = iota
-	Discrete
+	Integer
+	ImplicitInteger
 )
 
 type Dims struct {
@@ -96,7 +126,7 @@ func (h *Highs) AddColumns(cols []float64, lb []float64, ub []float64) error {
 		nil)
 
 	if err == 0 {
-		return errors.New(fmt.Sprintf("unable to add columns; returned error: %d", err))
+		return fmt.Errorf("unable to add columns; returned error: %d", err)
 	}
 
 	return nil
@@ -160,6 +190,7 @@ func (h *Highs) GetObjectiveSense() Sense {
 }
 
 func (h *Highs) SetIntegrality(col int, i Integrality) {
+	// currently causes segfault
 	_ = C.Highs_changeColIntegrality(h.obj, C.int(col), C.int(i))
 }
 
