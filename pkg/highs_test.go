@@ -1,12 +1,13 @@
 package highs
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func BuildExampleMipsHighs(t *testing.T) *Highs {
+func BuildExampleMipHighs(t *testing.T) *Highs {
 	h, err := New()
 	assert.NoError(t, err)
 
@@ -22,9 +23,10 @@ func BuildExampleMipsHighs(t *testing.T) *Highs {
 
 	h.SetRows(rows)
 
-	intg := []int{0, 1}
+	intg := []int{1, 1}
 	h.SetIntegrality(intg)
 
+	h.SetBoolOptionValue("output_flag", 1)
 	return h
 }
 
@@ -93,12 +95,6 @@ func TestSetRows(t *testing.T) {
 	assert.Equal(t, rows, h.rows)
 }
 
-func TestRunSolver(t *testing.T) {
-	h := BuildExampleHighs(t)
-
-	h.RunSolver()
-}
-
 func TestAllocateColumns(t *testing.T) {
 	h, _ := New()
 
@@ -131,10 +127,30 @@ func TestAllocateRows(t *testing.T) {
 	err := h.allocateRows()
 	assert.NoError(t, err)
 
-	_, l, u := separateBounds(bounded_rows)
+	r, l, u := separateBounds(bounded_rows)
+	pm := packMatrix(r)
 
+	assert.Equal(t, pm.arStart, (copyInts(h.ptrs.pArStart, h.ptrs.ArStartSize)), "arStart malformed")
+	assert.Equal(t, pm.arIndex, (copyInts(h.ptrs.pArIndex, h.ptrs.ArIndexSize)), "arIndex malformed")
+	assert.Equal(t, pm.arValue, (copyDoubles(h.ptrs.pArValue, h.ptrs.ArIndexSize)), "arValue malformed")
 	assert.Equal(t, l, (copyDoubles(h.ptrs.pRowLbs, len(h.rows))))
 	assert.Equal(t, u, (copyDoubles(h.ptrs.pRowUbs, len(h.rows))))
+}
+
+func TestRunLpSolver(t *testing.T) {
+	h := BuildExampleHighs(t)
+
+	s, err := h.RunSolver()
+	fmt.Println(s.colValue)
+	assert.NoError(t, err)
+}
+
+func TestRunMipSolver(t *testing.T) {
+	h := BuildExampleMipHighs(t)
+
+	s, err := h.RunSolver()
+	fmt.Println(s.colValue)
+	assert.NoError(t, err)
 }
 
 // SET option

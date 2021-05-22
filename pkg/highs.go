@@ -7,6 +7,7 @@ package highs
 import "C"
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"runtime"
 	"unsafe"
@@ -32,6 +33,26 @@ const (
 	ModelIterationLimit
 	ModelUnknown
 )
+
+func (d ModelStatus) String() string {
+	return [...]string{
+		"Model Not Set",
+		"Model Load Error",
+		"Model Error",
+		"Model Presolve Error",
+		"Model Solve Error",
+		"Model Postsolve Error",
+		"Model Empty",
+		"Model Optimal",
+		"Model Infeasible",
+		"Model Unbounded or Infeasible",
+		"Model Unbounded",
+		"Model Objetive Bound",
+		"Model Objective Target",
+		"Model TimeL imit",
+		"Model Iteration Limit",
+		"Model Unknown"}[d]
+}
 
 type SolutionStatus int
 
@@ -67,16 +88,17 @@ type Highs struct {
 }
 
 type highsPtrs struct {
-	pCols    unsafe.Pointer
-	pColLbs  unsafe.Pointer
-	pColUbs  unsafe.Pointer
-	pArStart unsafe.Pointer
-	pArIndex unsafe.Pointer
-	pArValue unsafe.Pointer
-	pRowLbs  unsafe.Pointer
-	pRowUbs  unsafe.Pointer
-	pIntg    unsafe.Pointer
-	ArSize   int
+	pCols       unsafe.Pointer
+	pColLbs     unsafe.Pointer
+	pColUbs     unsafe.Pointer
+	pArStart    unsafe.Pointer
+	pArIndex    unsafe.Pointer
+	pArValue    unsafe.Pointer
+	pRowLbs     unsafe.Pointer
+	pRowUbs     unsafe.Pointer
+	pIntg       unsafe.Pointer
+	ArStartSize int
+	ArIndexSize int
 }
 
 // New returns an allocated Highs object
@@ -188,7 +210,8 @@ func (h *Highs) allocateRows() error {
 
 	pm := packMatrix(rows) // [lb, row constraints..., ub]
 
-	h.ptrs.ArSize = len(pm.arIndex)
+	h.ptrs.ArStartSize = len(pm.arStart)
+	h.ptrs.ArIndexSize = len(pm.arIndex)
 
 	pArStart := cMalloc(len(pm.arStart), C.int(0))
 	h.allocs = append(h.allocs, pArStart)
@@ -236,23 +259,21 @@ func (h *Highs) allocateIntegrality() error {
 func (h *Highs) RunSolver() (Solution, error) {
 
 	h.allocate()
-
 	if len(h.integrality) > 0 {
 		return h.runMipsSolver()
 	}
-
 	return h.runLpSolver()
 }
 
 func (h *Highs) runMipsSolver() (Solution, error) {
-
 	h.PassMip()
-	s := h.Run()
-	if s == SolutionInfeasible {
-		return Solution{}, errors.New("model infeasible")
+	h.Run()
+	status := h.GetModelStatus()
+	if status == ModelOptimal {
+		return h.GetSolution(), nil
 	}
 
-	return Solution{}, nil
+	return Solution{}, fmt.Errorf("solver error: %s", status)
 }
 
 func (h *Highs) PassMip() SolutionStatus {
@@ -261,8 +282,8 @@ func (h *Highs) PassMip() SolutionStatus {
 		h.obj,
 		C.int(len(h.cols)),
 		C.int(len(h.rows)),
-		C.int(h.ptrs.ArSize),
-		C.int(0),
+		C.int(h.ptrs.ArIndexSize),
+		C.int(1),
 		(*C.double)(h.ptrs.pCols),
 		(*C.double)(h.ptrs.pColLbs),
 		(*C.double)(h.ptrs.pColUbs),
@@ -278,12 +299,13 @@ func (h *Highs) PassMip() SolutionStatus {
 
 func (h *Highs) runLpSolver() (Solution, error) {
 	h.PassLp()
-	s := h.Run()
-	if s == SolutionInfeasible {
-		return Solution{}, errors.New("model infeasible")
+	h.Run()
+	status := h.GetModelStatus()
+	if status == ModelOptimal {
+		return h.GetSolution(), nil
 	}
 
-	return Solution{}, nil
+	return Solution{}, fmt.Errorf("solver error: %s", status)
 }
 
 func (h *Highs) PassLp() SolutionStatus {
@@ -291,8 +313,8 @@ func (h *Highs) PassLp() SolutionStatus {
 		h.obj,
 		C.int(len(h.cols)),
 		C.int(len(h.rows)),
-		C.int(h.ptrs.ArSize),
-		C.int(0),
+		C.int(h.ptrs.ArIndexSize),
+		C.int(1),
 		(*C.double)(h.ptrs.pCols),
 		(*C.double)(h.ptrs.pColLbs),
 		(*C.double)(h.ptrs.pColUbs),
@@ -346,7 +368,7 @@ func (h *Highs) GetStringOptionValue(opt string) string {
 
 func (h *Highs) Run() SolutionStatus {
 	s := C.Highs_run(h.obj)
-	return (SolutionStatus)(s)
+	return SolutionStatus(s)
 }
 
 type Solution struct {
@@ -360,7 +382,7 @@ func NewSolution() Solution {
 	return Solution{[]float64{}, []float64{}, []float64{}, []float64{}}
 }
 
-func (h *Highs) getSolution() Solution {
+func (h *Highs) GetSolution() Solution {
 	// this is dangerous, need to be sure the column size isn't changed after
 	// allocation and pass to HiGHs
 	n := len(h.cols)
@@ -394,6 +416,11 @@ func (h *Highs) getSolution() Solution {
 	cFree(pRowDual)
 
 	return s
+}
+
+func (h *Highs) GetModelStatus() ModelStatus {
+	s := C.Highs_getModelStatus(h.obj)
+	return ModelStatus(s)
 }
 
 type PackedMatrix struct {
@@ -470,6 +497,21 @@ func cSetArrayInt(a unsafe.Pointer, i, v int) {
 	*(*C.int)(ptr) = C.int(v)
 }
 
+func copyInts(a unsafe.Pointer, size int) []int {
+	gs := make([]int, size)
+	for i := range gs {
+		gs[i] = cGetArrayInt(a, i)
+	}
+
+	return gs
+}
+
+func cGetArrayInt(a unsafe.Pointer, i int) int {
+	eSize := unsafe.Sizeof(C.int(0))
+	ptr := unsafe.Pointer(uintptr(a) + uintptr(i)*eSize)
+	return int(*(*C.int)(ptr))
+}
+
 func cSetArrayDoubles(a unsafe.Pointer, vs []float64) {
 	for i, v := range vs {
 		cSetArrayDouble(a, i, v)
@@ -500,50 +542,3 @@ func cGetArrayDouble(a unsafe.Pointer, i int) float64 {
 	ptr := unsafe.Pointer(uintptr(a) + uintptr(i)*eSize)
 	return float64(*(*C.double)(ptr))
 }
-
-/*
-// A Nonzero represents an element in a sparse row or column.
-type Nonzero struct {
-	Index int     // Zero-based element offset
-	Value float64 // Value at that offset
-}
-
-// A Matrix sparsely represents a set of linear expressions.  Each column
-// represents a variable, each row represents an expression, and each cell
-// containing a coefficient. Bounds on rows and columns are applied during
-// model initialization.
-type Matrix interface {
-	AppendColumn(col []Nonzero) // Append a column given values for all of its nonzero elements
-	Dims() (rows, cols int)     // Return the matrix's dimensions
-}
-
-
-// c__GetArrayInt returns a[i] as a Go int where a is a C.int array allocated
-// by cMalloc and i is a Go ints.
-func cGetArrayInt(a unsafe.Pointer, i int) int {
-	eSize := unsafe.Sizeof(C.int(0))
-	ptr := unsafe.Pointer(uintptr(a) + uintptr(i)*eSize)
-	return int(*(*C.int)(ptr))
-}
-
-// copyIntsGoC copies a slice of Go ints to a slice of C ints.
-func copyIntsGoC(cs []C.int, gs []int) {
-	if len(gs) != len(cs) {
-		panic("Slices of different sizes were passed to copyIntsGoC")
-	}
-	for i, g := range gs {
-		cs[i] = C.int(g)
-	}
-}
-
-// copyIntsCGo copies a slice of C ints to a slice of Go ints.
-func copyIntsCGo(gs []int, cs []C.int) {
-	if len(gs) != len(cs) {
-		panic("Slices of different sizes were passed to copyIntsCGo")
-	}
-	for i, c := range cs {
-		gs[i] = int(c)
-	}
-}
-
-*/
