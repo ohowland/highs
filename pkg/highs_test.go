@@ -159,13 +159,13 @@ func TestGetStringOptionValue(t *testing.T) {
 func TestChangeObjectiveSense(t *testing.T) {
 	h := BuildExampleHighs(t)
 
-	h.SetObjectiveSense(Minimize)
+	h.SetObjectiveSense(-1)
 	s := h.GetObjectiveSense()
-	assert.Equal(t, Minimize, s, "sense is not Minimize")
+	assert.Equal(t, -1, s, "sense is not Minimize")
 
-	h.SetObjectiveSense(Maximize)
+	h.SetObjectiveSense(1)
 	s = h.GetObjectiveSense()
-	assert.Equal(t, Maximize, s, "sense is not Maximize")
+	assert.Equal(t, 1, s, "sense is not Maximize")
 
 }
 
