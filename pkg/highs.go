@@ -13,6 +13,13 @@ import (
 	"unsafe"
 )
 
+type Sense int
+
+const (
+	Maximize Sense = -1
+	Minimize Sense = 1
+)
+
 type Integrality int
 
 const (
@@ -140,16 +147,16 @@ func (h *Highs) AddRows(rows [][]float64, lb []float64, ub []float64) error {
 	return nil
 }
 
-func (h *Highs) SetObjectiveSense(s int) {
+func (h *Highs) SetObjectiveSense(s Sense) {
 	C.Highs_changeObjectiveSense(h.obj, C.int(s))
 }
 
-func (h *Highs) GetObjectiveSense() int {
+func (h *Highs) GetObjectiveSense() Sense {
 	pS := cMalloc(1, C.int(0))
 	h.allocs = append(h.allocs, pS)
 	C.Highs_getObjectiveSense(h.obj, (*C.int)(pS))
 
-	return (int(*(*C.int)(pS)))
+	return (Sense)(int(*(*C.int)(pS)))
 }
 
 func (h *Highs) SetIntegrality(col int, i Integrality) {
