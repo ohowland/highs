@@ -85,9 +85,9 @@ func TestAllocateColumns(t *testing.T) {
 	cols := []float64{2.0, 3.0}
 
 	h.allocateColumns()
-	assert.Equal(t, cols, (copyDoubles(h.ptrs.pCols, len(h.cols))))
-	assert.Equal(t, h.GetLowerBounds(), (copyDoubles(h.ptrs.pColLbs, len(h.cols))))
-	assert.Equal(t, h.GetUpperBounds(), (copyDoubles(h.ptrs.pColUbs, len(h.cols))))
+	assert.Equal(t, cols, (copyDoubles(h.allocs[pCols], len(h.cols))))
+	assert.Equal(t, h.GetLowerBounds(), (copyDoubles(h.allocs[pColLbs], len(h.cols))))
+	assert.Equal(t, h.GetUpperBounds(), (copyDoubles(h.allocs[pColUbs], len(h.cols))))
 }
 
 func TestAllocateRows(t *testing.T) {
@@ -106,11 +106,11 @@ func TestAllocateRows(t *testing.T) {
 	r, l, u := separateBounds(bounded_rows)
 	pm := packMatrix(r)
 
-	assert.Equal(t, pm.arStart, (copyInts(h.ptrs.pArStart, h.ptrs.ArStartSize)), "arStart malformed")
-	assert.Equal(t, pm.arIndex, (copyInts(h.ptrs.pArIndex, h.ptrs.ArIndexSize)), "arIndex malformed")
-	assert.Equal(t, pm.arValue, (copyDoubles(h.ptrs.pArValue, h.ptrs.ArIndexSize)), "arValue malformed")
-	assert.Equal(t, l, (copyDoubles(h.ptrs.pRowLbs, len(h.rows))))
-	assert.Equal(t, u, (copyDoubles(h.ptrs.pRowUbs, len(h.rows))))
+	assert.Equal(t, pm.arStart, (copyInts(h.allocs[pArStart], h.dims.ArStartSize)), "arStart malformed")
+	assert.Equal(t, pm.arIndex, (copyInts(h.allocs[pArIndex], h.dims.ArIndexSize)), "arIndex malformed")
+	assert.Equal(t, pm.arValue, (copyDoubles(h.allocs[pArValue], h.dims.ArIndexSize)), "arValue malformed")
+	assert.Equal(t, l, (copyDoubles(h.allocs[pRowLbs], len(h.rows))))
+	assert.Equal(t, u, (copyDoubles(h.allocs[pRowUbs], len(h.rows))))
 }
 
 func TestRunLpSolver(t *testing.T) {
