@@ -26,7 +26,7 @@ func BuildExampleMipHighs(t *testing.T) *Highs {
 	intg := []int{1, 1}
 	h.SetIntegrality(intg)
 
-	h.SetBoolOptionValue("output_flag", 1)
+	h.SetBoolOptionValue("output_flag", true)
 	return h
 }
 
@@ -153,10 +153,15 @@ func TestRunMipSolver(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// SET option
+// SET/GET option
 
 func TestSetBoolOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
+	h, _ := New()
+	h.SetBoolOptionValue("output_flag", true)
+
+	r := h.GetBoolOptionValue("output_flag")
+
+	assert.Equal(t, true, r)
 }
 
 func TestSetIntOptionValue(t *testing.T) {
@@ -168,10 +173,6 @@ func TestSetDoubleOptionValue(t *testing.T) {
 }
 
 func TestSetStringOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
-
-func TestSetOptionValue(t *testing.T) {
 	h, _ := New()
 	opt := "solver"
 	val := "ipm"
@@ -181,25 +182,6 @@ func TestSetOptionValue(t *testing.T) {
 
 	assert.Equal(t, val, r, "value written to option was not returned")
 
-}
-
-// GET option
-
-func TestGetBoolOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
-
-func TestGetIntOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
-
-func TestGetDoubleOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
-
-func TestGetStringOptionValue(t *testing.T) {
-
-	assert.Fail(t, "unimplemented")
 }
 
 // Objective Sense

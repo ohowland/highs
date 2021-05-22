@@ -331,41 +331,6 @@ func (h *Highs) callLpSolver() (Solution, error) {
 	return Solution{}, nil
 }
 
-func (h *Highs) SetObjectiveSense(s Sense) {
-	C.Highs_changeObjectiveSense(h.obj, C.int(s))
-}
-
-func (h *Highs) GetObjectiveSense() Sense {
-	pS := cMalloc(1, C.int(0))
-	h.allocs = append(h.allocs, pS)
-	C.Highs_getObjectiveSense(h.obj, (*C.int)(pS))
-
-	return (Sense)(int(*(*C.int)(pS)))
-}
-
-func (h *Highs) SetStringOptionValue(opt string, val string) {
-
-	pOpt := C.CString(opt)
-	defer cFree(unsafe.Pointer(pOpt))
-
-	pVal := C.CString(val)
-	defer cFree(unsafe.Pointer(pVal))
-
-	C.Highs_setStringOptionValue(h.obj, pOpt, pVal)
-}
-
-func (h *Highs) GetStringOptionValue(opt string) string {
-	pOpt := C.CString(opt)
-	defer cFree(unsafe.Pointer(pOpt))
-
-	pVal := cMalloc(1024, C.char('A'))
-	defer cFree(pVal)
-
-	C.Highs_getStringOptionValue(h.obj, pOpt, (*C.char)(pVal))
-
-	return C.GoString((*C.char)(pVal))
-}
-
 func (h *Highs) Run() SolutionStatus {
 	s := C.Highs_run(h.obj)
 	return SolutionStatus(s)
@@ -421,6 +386,68 @@ func (h *Highs) GetSolution() Solution {
 func (h *Highs) GetModelStatus() ModelStatus {
 	s := C.Highs_getModelStatus(h.obj)
 	return ModelStatus(s)
+}
+
+func (h *Highs) SetObjectiveSense(s Sense) {
+	C.Highs_changeObjectiveSense(h.obj, C.int(s))
+}
+
+func (h *Highs) GetObjectiveSense() Sense {
+	pS := cMalloc(1, C.int(0))
+	h.allocs = append(h.allocs, pS)
+	C.Highs_getObjectiveSense(h.obj, (*C.int)(pS))
+
+	return (Sense)(int(*(*C.int)(pS)))
+}
+
+func (h *Highs) SetStringOptionValue(opt string, val string) {
+
+	pOpt := C.CString(opt)
+	defer cFree(unsafe.Pointer(pOpt))
+
+	pVal := C.CString(val)
+	defer cFree(unsafe.Pointer(pVal))
+
+	C.Highs_setStringOptionValue(h.obj, pOpt, pVal)
+}
+
+func (h *Highs) GetStringOptionValue(opt string) string {
+	pOpt := C.CString(opt)
+	defer cFree(unsafe.Pointer(pOpt))
+
+	pVal := cMalloc(1024, C.char('A'))
+	defer cFree(pVal)
+
+	C.Highs_getStringOptionValue(h.obj, pOpt, (*C.char)(pVal))
+
+	return C.GoString((*C.char)(pVal))
+}
+
+func (h *Highs) SetBoolOptionValue(opt string, val bool) {
+
+	pOpt := C.CString(opt)
+	defer cFree(unsafe.Pointer(pOpt))
+
+	var v C.int
+	if val == true {
+		v = C.int(1)
+	} else {
+		v = C.int(0)
+	}
+
+	C.Highs_setBoolOptionValue(h.obj, pOpt, v)
+}
+
+func (h *Highs) GetBoolOptionValue(opt string) bool {
+	pOpt := C.CString(opt)
+	defer cFree(unsafe.Pointer(pOpt))
+
+	pVal := cMalloc(1, C.int(0))
+	defer cFree(pVal)
+
+	C.Highs_getBoolOptionValue(h.obj, pOpt, (*C.int)(pVal))
+
+	return int(*(*C.int)(pVal)) > 0
 }
 
 type PackedMatrix struct {
