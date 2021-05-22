@@ -1,7 +1,6 @@
 package highs
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,34 +22,28 @@ func BuildExampleMipHighs(t *testing.T) *Highs {
 }
 
 func BuildExampleHighs(t *testing.T) *Highs {
-	h, err := New()
-	assert.NoError(t, err)
-
 	cols := []float64{2.0, 3.0}
-	h.SetColumns(cols)
 	bnds := [][2]float64{{0.0, 3.0}, {1.0, 1e30}}
-	h.SetBounds(bnds)
 
 	rows := [][]float64{
 		{-1e30, 0.0, 1.0, 6.0},
 		{10.0, 1.0, 2.0, 14.0},
 		{8.0, 2.0, 1.0, 1e30}}
 
-	h.SetRows(rows)
+	h, err := New(cols, bnds, rows, []int{})
 	assert.NoError(t, err)
 
 	return h
 }
 
 func TestCreateHighs(t *testing.T) {
-	_, err := New()
+	_, err := New([]float64{}, [][2]float64{}, [][]float64{}, []int{})
 	assert.Nil(t, err, "Error returned when allocating new highs object.")
 }
 
 func TestSetCols(t *testing.T) {
-	h, _ := New()
+	h := BuildExampleHighs(t)
 	cols := []float64{2.0, 3.0}
-	h.SetColumns(cols)
 	assert.Equal(t, cols, h.cols, "Error returned when adding columns to highs object")
 }
 
@@ -77,23 +70,19 @@ func TestPackRows(t *testing.T) {
 }
 
 func TestSetRows(t *testing.T) {
-	h, _ := New()
+	h := BuildExampleHighs(t)
 	rows := [][]float64{
-		{-10e30, 0.0, 1.0, 6.0},
+		{-1e30, 0.0, 1.0, 6.0},
 		{10.0, 1.0, 2.0, 14.0},
-		{8.0, 2.0, 1.0, 1.0e30}}
-	h.SetRows(rows)
+		{8.0, 2.0, 1.0, 1e30}}
 
 	assert.Equal(t, rows, h.rows)
 }
 
 func TestAllocateColumns(t *testing.T) {
-	h, _ := New()
+	h := BuildExampleHighs(t)
 
 	cols := []float64{2.0, 3.0}
-	h.SetColumns(cols)
-	bnds := [][2]float64{{0.0, 3.0}, {1.0, 1e30}}
-	h.SetBounds(bnds)
 
 	h.allocateColumns()
 	assert.Equal(t, cols, (copyDoubles(h.ptrs.pCols, len(h.cols))))
@@ -102,12 +91,8 @@ func TestAllocateColumns(t *testing.T) {
 }
 
 func TestAllocateRows(t *testing.T) {
-	h, _ := New()
+	h := BuildExampleHighs(t)
 
-	cols := []float64{2.0, 3.0}
-	h.SetColumns(cols)
-	bnds := [][2]float64{{0.0, 3.0}, {1.0, 1e30}}
-	h.SetBounds(bnds)
 	h.allocateColumns()
 
 	bounded_rows := [][]float64{
@@ -115,7 +100,6 @@ func TestAllocateRows(t *testing.T) {
 		{10.0, 1.0, 2.0, 14.0},
 		{8.0, 2.0, 1.0, 1e30}}
 
-	h.SetRows(bounded_rows)
 	err := h.allocateRows()
 	assert.NoError(t, err)
 
@@ -132,23 +116,21 @@ func TestAllocateRows(t *testing.T) {
 func TestRunLpSolver(t *testing.T) {
 	h := BuildExampleHighs(t)
 
-	s, err := h.RunSolver()
-	fmt.Println(s.colValue)
+	_, err := h.RunSolver()
 	assert.NoError(t, err)
 }
 
 func TestRunMipSolver(t *testing.T) {
 	h := BuildExampleMipHighs(t)
 
-	s, err := h.RunSolver()
-	fmt.Println(s.colValue)
+	_, err := h.RunSolver()
 	assert.NoError(t, err)
 }
 
 // SET/GET option
 
 func TestSetBoolOptionValue(t *testing.T) {
-	h, _ := New()
+	h := BuildExampleHighs(t)
 	h.SetBoolOptionValue("output_flag", true)
 
 	r := h.GetBoolOptionValue("output_flag")
@@ -165,7 +147,7 @@ func TestSetDoubleOptionValue(t *testing.T) {
 }
 
 func TestSetStringOptionValue(t *testing.T) {
-	h, _ := New()
+	h := BuildExampleHighs(t)
 	opt := "solver"
 	val := "ipm"
 	h.SetStringOptionValue(opt, val)

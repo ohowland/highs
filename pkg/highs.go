@@ -102,13 +102,13 @@ type highsPtrs struct {
 }
 
 // New returns an allocated Highs object
-func New(cols []float64, bounds [][2]float64, rows [][]float64, integrality []int) (*Highs, error) {
+func New(cost_coefficients []float64, bounds [][2]float64, constraints [][]float64, integrality []int) (*Highs, error) {
 	h := &Highs{
 		obj:         C.Highs_create(),
 		allocs:      []unsafe.Pointer{},
-		cols:        cols,
+		cols:        cost_coefficients,
 		bounds:      bounds,
-		rows:        rows,
+		rows:        constraints,
 		integrality: integrality,
 	}
 
@@ -365,6 +365,11 @@ func (h *Highs) GetSolution() Solution {
 	cFree(pRowDual)
 
 	return s
+}
+
+func (h *Highs) PrimalColumnSolution() []float64 {
+	s := h.GetSolution()
+	return s.colValue
 }
 
 func (h *Highs) GetModelStatus() ModelStatus {
