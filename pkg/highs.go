@@ -102,14 +102,14 @@ type highsPtrs struct {
 }
 
 // New returns an allocated Highs object
-func New() (*Highs, error) {
+func New(cols []float64, bounds [][2]float64, rows [][]float64, integrality []int) (*Highs, error) {
 	h := &Highs{
 		obj:         C.Highs_create(),
 		allocs:      []unsafe.Pointer{},
-		cols:        []float64{},
-		bounds:      [][2]float64{},
-		rows:        [][]float64{},
-		integrality: []int{},
+		cols:        cols,
+		bounds:      bounds,
+		rows:        rows,
+		integrality: integrality,
 	}
 
 	runtime.SetFinalizer(h, func(h *Highs) {
@@ -131,22 +131,6 @@ func (h *Highs) destroy() {
 		h.allocs = nil
 		h.ptrs = highsPtrs{}
 	}
-}
-
-func (h *Highs) SetColumns(c []float64) {
-	h.cols = c
-}
-
-func (h *Highs) SetRows(r [][]float64) {
-	h.rows = r
-}
-
-func (h *Highs) SetBounds(b [][2]float64) {
-	h.bounds = b
-}
-
-func (h *Highs) SetIntegrality(i []int) {
-	h.integrality = i
 }
 
 func (h *Highs) GetLowerBounds() []float64 {

@@ -8,25 +8,17 @@ import (
 )
 
 func BuildExampleMipHighs(t *testing.T) *Highs {
-	h, err := New()
-	assert.NoError(t, err)
-
 	cols := []float64{2.0, 3.0}
-	h.SetColumns(cols)
 	bnds := [][2]float64{{0.0, 3.0}, {1.0, 1e30}}
-	h.SetBounds(bnds)
-
 	rows := [][]float64{
 		{-1e30, 0.0, 1.0, 6.0},
 		{10.0, 1.0, 2.0, 14.0},
 		{8.0, 2.0, 1.0, 1e30}}
-
-	h.SetRows(rows)
-
 	intg := []int{1, 1}
-	h.SetIntegrality(intg)
 
-	h.SetBoolOptionValue("output_flag", true)
+	h, err := New(cols, bnds, rows, intg)
+	assert.NoError(t, err)
+
 	return h
 }
 
