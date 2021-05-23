@@ -16,30 +16,50 @@ import (
 type ModelStatus int
 
 const (
-	Notset ModelStatus = iota
-	LoadError
+	ModelNotset ModelStatus = iota
+	ModelLoadError
 	ModelError
-	PresolveError
-	SolveError
-	PostsolveError
+	ModelPresolveError
+	ModelSolveError
+	ModelPostsolveError
 	ModelEmpty
-	Optimal
-	Infeasible
-	UnboundedOrInfeasible
-	Unbounded
-	ObjectiveBound
-	ObjectiveTarget
-	TimeLimit
-	IterationLimit
-	Unknown
+	ModelOptimal
+	ModelInfeasible
+	ModelUnboundedOrInfeasible
+	ModelUnbounded
+	ModelObjectiveBound
+	ModelObjectiveTarget
+	ModelTimeLimit
+	ModelIterationLimit
+	ModelUnknown
 )
+
+func (d ModelStatus) String() string {
+	return [...]string{
+		"Model Not Set",
+		"Model Load Error",
+		"Model Error",
+		"Model Presolve Error",
+		"Model Solve Error",
+		"Model Postsolve Error",
+		"Model Empty",
+		"Model Optimal",
+		"Model Infeasible",
+		"Model Unbounded or Infeasible",
+		"Model Unbounded",
+		"Model Objetive Bound",
+		"Model Objective Target",
+		"Model TimeL imit",
+		"Model Iteration Limit",
+		"Model Unknown"}[d]
+}
 
 type SolutionStatus int
 
 const (
-	kSolutionStatusNone SolutionStatus = iota
-	kSolutionStatusInfeasible
-	kSolutionStatusFeasible
+	SolutionNone SolutionStatus = iota
+	SolutionInfeasible
+	SolutionFeasible
 )
 
 type Sense int
@@ -57,23 +77,39 @@ const (
 	ImplicitInteger
 )
 
-type Dims struct {
-	rows int
-	cols int
+type Highs struct {
+	obj         unsafe.Pointer
+	allocs      []unsafe.Pointer
+	cols        []float64
+	bounds      [][2]float64
+	rows        [][]float64
+	integrality []int
+	ptrs        highsPtrs
 }
 
-type Highs struct {
-	obj    unsafe.Pointer
-	allocs []unsafe.Pointer
-	dims   Dims
+type highsPtrs struct {
+	pCols       unsafe.Pointer
+	pColLbs     unsafe.Pointer
+	pColUbs     unsafe.Pointer
+	pArStart    unsafe.Pointer
+	pArIndex    unsafe.Pointer
+	pArValue    unsafe.Pointer
+	pRowLbs     unsafe.Pointer
+	pRowUbs     unsafe.Pointer
+	pIntg       unsafe.Pointer
+	ArStartSize int
+	ArIndexSize int
 }
 
 // New returns an allocated Highs object
 func New() (*Highs, error) {
 	h := &Highs{
-		obj:    C.Highs_create(),
-		allocs: make([]unsafe.Pointer, 0, 64),
-		dims:   Dims{0, 0},
+		obj:         C.Highs_create(),
+		allocs:      []unsafe.Pointer{},
+		cols:        []float64{},
+		bounds:      [][2]float64{},
+		rows:        [][]float64{},
+		integrality: []int{},
 	}
 
 	runtime.SetFinalizer(h, func(h *Highs) {
@@ -93,88 +129,263 @@ func (h *Highs) destroy() {
 			cFree(p)
 		}
 		h.allocs = nil
+		h.ptrs = highsPtrs{}
 	}
 }
 
-func (h *Highs) AddColumns(cols []float64, lb []float64, ub []float64) error {
-	h.dims.cols = len(cols)
-	if h.dims.cols != len(lb) || h.dims.cols != len(ub) {
-		return errors.New("all slice parameters must be equal length.")
+func (h *Highs) SetColumns(c []float64) {
+	h.cols = c
+}
+
+func (h *Highs) SetRows(r [][]float64) {
+	h.rows = r
+}
+
+func (h *Highs) SetBounds(b [][2]float64) {
+	h.bounds = b
+}
+
+func (h *Highs) SetIntegrality(i []int) {
+	h.integrality = i
+}
+
+func (h *Highs) GetLowerBounds() []float64 {
+	lbs := make([]float64, len(h.cols))
+	for i, lb := range h.bounds {
+		lbs[i] = lb[0]
 	}
 
-	pCols := cMalloc(h.dims.cols, C.double(0))
+	return lbs
+}
+
+func (h *Highs) GetUpperBounds() []float64 {
+	ubs := make([]float64, len(h.cols))
+	for i, ub := range h.bounds {
+		ubs[i] = ub[1]
+	}
+
+	return ubs
+}
+
+func (h *Highs) allocate() {
+	h.allocateColumns()
+	h.allocateRows()
+	h.allocateIntegrality()
+}
+
+func (h *Highs) allocateColumns() error {
+	n := len(h.cols)
+	if n < len(h.bounds) {
+		return errors.New("columns are under bounded")
+	}
+
+	if n > len(h.bounds) {
+		return errors.New("columns are over bounded")
+	}
+
+	pCols := cMalloc(n, C.double(0))
 	h.allocs = append(h.allocs, pCols)
-	cSetArrayDoubles(pCols, cols)
+	cSetArrayDoubles(pCols, h.cols)
+	h.ptrs.pCols = pCols
 
-	pLb := cMalloc(h.dims.cols, C.double(0))
+	pLb := cMalloc(n, C.double(0))
 	h.allocs = append(h.allocs, pLb)
-	cSetArrayDoubles(pLb, lb)
+	cSetArrayDoubles(pLb, h.GetLowerBounds())
+	h.ptrs.pColLbs = pLb
 
-	pUb := cMalloc(h.dims.cols, C.double(0))
+	pUb := cMalloc(n, C.double(0))
 	h.allocs = append(h.allocs, pUb)
-	cSetArrayDoubles(pUb, ub)
-
-	err := C.Highs_addCols(
-		h.obj,
-		C.int(h.dims.cols),
-		(*C.double)(pCols),
-		(*C.double)(pLb),
-		(*C.double)(pUb),
-		C.int(0),
-		nil,
-		nil,
-		nil)
-
-	if err == 0 {
-		return fmt.Errorf("unable to add columns; returned error: %d", err)
-	}
+	cSetArrayDoubles(pUb, h.GetUpperBounds())
+	h.ptrs.pColUbs = pUb
 
 	return nil
 }
 
-func (h *Highs) AddRows(rows [][]float64, lb []float64, ub []float64) error {
-	h.dims.rows = len(rows)
-	if h.dims.rows != len(lb) || h.dims.rows != len(ub) {
-		return errors.New("an upper and lower bound must be specified for all rows, len(row[0]) != len(ub) or len(lb)")
+func (h *Highs) allocateRows() error {
+	if len(h.rows[0])-2 != len(h.cols) {
+		return errors.New("row size mismatch len(row[i]) != len(col)")
 	}
 
-	pm := packMatrix(rows)
+	rows, lbs, ubs := separateBounds(h.rows)
+
+	pm := packMatrix(rows) // [lb, row constraints..., ub]
+
+	h.ptrs.ArStartSize = len(pm.arStart)
+	h.ptrs.ArIndexSize = len(pm.arIndex)
 
 	pArStart := cMalloc(len(pm.arStart), C.int(0))
 	h.allocs = append(h.allocs, pArStart)
 	cSetArrayInts(pArStart, pm.arStart)
+	h.ptrs.pArStart = pArStart
 
 	pArIndex := cMalloc(len(pm.arIndex), C.int(0))
 	h.allocs = append(h.allocs, pArIndex)
 	cSetArrayInts(pArIndex, pm.arIndex)
+	h.ptrs.pArIndex = pArIndex
 
 	pArValue := cMalloc(len(pm.arValue), C.double(0))
 	h.allocs = append(h.allocs, pArValue)
 	cSetArrayDoubles(pArValue, pm.arValue)
+	h.ptrs.pArValue = pArValue
 
-	pLb := cMalloc(h.dims.rows, C.double(0))
+	m := len(h.rows)
+	pLb := cMalloc(m, C.double(0))
 	h.allocs = append(h.allocs, pLb)
-	cSetArrayDoubles(pLb, lb)
+	cSetArrayDoubles(pLb, lbs)
+	h.ptrs.pRowLbs = pLb
 
-	pUb := cMalloc(h.dims.rows, C.double(0))
+	pUb := cMalloc(m, C.double(0))
 	h.allocs = append(h.allocs, pUb)
-	cSetArrayDoubles(pUb, ub)
-
-	err := C.Highs_addRows(
-		h.obj,
-		C.int(h.dims.rows),
-		(*C.double)(pLb),
-		(*C.double)(pUb),
-		C.int(len(pm.arIndex)),
-		(*C.int)(pArStart),
-		(*C.int)(pArIndex),
-		(*C.double)(pArValue))
-
-	if err == 0 {
-		return fmt.Errorf("unable to add rows; returned error: %d", err)
-	}
+	cSetArrayDoubles(pUb, ubs)
+	h.ptrs.pRowUbs = pUb
 
 	return nil
+}
+
+func (h *Highs) allocateIntegrality() error {
+	n := len(h.cols)
+	if n != len(h.integrality) {
+		return errors.New("integrality len does not match column len")
+	}
+
+	pIntg := cMalloc(n, C.int(0))
+	h.allocs = append(h.allocs, pIntg)
+	cSetArrayInts(pIntg, h.integrality)
+	h.ptrs.pIntg = pIntg
+
+	return nil
+}
+
+func (h *Highs) RunSolver() (Solution, error) {
+
+	h.allocate()
+	if len(h.integrality) > 0 {
+		return h.runMipsSolver()
+	}
+	return h.runLpSolver()
+}
+
+func (h *Highs) runMipsSolver() (Solution, error) {
+	h.PassMip()
+	h.Run()
+	status := h.GetModelStatus()
+	if status == ModelOptimal {
+		return h.GetSolution(), nil
+	}
+
+	return Solution{}, fmt.Errorf("solver error: %s", status)
+}
+
+func (h *Highs) PassMip() SolutionStatus {
+
+	s := C.Highs_passMip(
+		h.obj,
+		C.int(len(h.cols)),
+		C.int(len(h.rows)),
+		C.int(h.ptrs.ArIndexSize),
+		C.int(1),
+		(*C.double)(h.ptrs.pCols),
+		(*C.double)(h.ptrs.pColLbs),
+		(*C.double)(h.ptrs.pColUbs),
+		(*C.double)(h.ptrs.pRowLbs),
+		(*C.double)(h.ptrs.pRowUbs),
+		(*C.int)(h.ptrs.pArStart),
+		(*C.int)(h.ptrs.pArIndex),
+		(*C.double)(h.ptrs.pArValue),
+		(*C.int)(h.ptrs.pIntg))
+
+	return (SolutionStatus)(s)
+}
+
+func (h *Highs) runLpSolver() (Solution, error) {
+	h.PassLp()
+	h.Run()
+	status := h.GetModelStatus()
+	if status == ModelOptimal {
+		return h.GetSolution(), nil
+	}
+
+	return Solution{}, fmt.Errorf("solver error: %s", status)
+}
+
+func (h *Highs) PassLp() SolutionStatus {
+	s := C.Highs_passLp(
+		h.obj,
+		C.int(len(h.cols)),
+		C.int(len(h.rows)),
+		C.int(h.ptrs.ArIndexSize),
+		C.int(1),
+		(*C.double)(h.ptrs.pCols),
+		(*C.double)(h.ptrs.pColLbs),
+		(*C.double)(h.ptrs.pColUbs),
+		(*C.double)(h.ptrs.pRowLbs),
+		(*C.double)(h.ptrs.pRowUbs),
+		(*C.int)(h.ptrs.pArStart),
+		(*C.int)(h.ptrs.pArIndex),
+		(*C.double)(h.ptrs.pArValue))
+
+	return (SolutionStatus)(s)
+}
+
+func (h *Highs) callLpSolver() (Solution, error) {
+	return Solution{}, nil
+}
+
+func (h *Highs) Run() SolutionStatus {
+	s := C.Highs_run(h.obj)
+	return SolutionStatus(s)
+}
+
+type Solution struct {
+	colValue []float64
+	colDual  []float64
+	rowValue []float64
+	rowDual  []float64
+}
+
+func NewSolution() Solution {
+	return Solution{[]float64{}, []float64{}, []float64{}, []float64{}}
+}
+
+func (h *Highs) GetSolution() Solution {
+	// this is dangerous, need to be sure the column size isn't changed after
+	// allocation and pass to HiGHs
+	n := len(h.cols)
+	m := len(h.rows)
+
+	pColValue := cMalloc(n, C.double(0))
+	h.allocs = append(h.allocs, pColValue)
+
+	pColDual := cMalloc(n, C.double(0))
+	h.allocs = append(h.allocs, pColDual)
+
+	pRowValue := cMalloc(m, C.double(0))
+	h.allocs = append(h.allocs, pRowValue)
+
+	pRowDual := cMalloc(m, C.double(0))
+	h.allocs = append(h.allocs, pRowDual)
+
+	C.Highs_getSolution(h.obj, (*C.double)(pColValue), (*C.double)(pColDual), (*C.double)(pRowValue), (*C.double)(pRowDual))
+
+	s := NewSolution()
+	s.colValue = copyDoubles(pColValue, n)
+	cFree(pColValue)
+
+	s.colDual = copyDoubles(pColDual, n)
+	cFree(pColDual)
+
+	s.rowValue = copyDoubles(pRowValue, m)
+	cFree(pRowValue)
+
+	s.rowDual = copyDoubles(pRowDual, m)
+	cFree(pRowDual)
+
+	return s
+}
+
+func (h *Highs) GetModelStatus() ModelStatus {
+	s := C.Highs_getModelStatus(h.obj)
+	return ModelStatus(s)
 }
 
 func (h *Highs) SetObjectiveSense(s Sense) {
@@ -187,11 +398,6 @@ func (h *Highs) GetObjectiveSense() Sense {
 	C.Highs_getObjectiveSense(h.obj, (*C.int)(pS))
 
 	return (Sense)(int(*(*C.int)(pS)))
-}
-
-func (h *Highs) SetIntegrality(col int, i Integrality) {
-	// currently causes segfault
-	_ = C.Highs_changeColIntegrality(h.obj, C.int(col), C.int(i))
 }
 
 func (h *Highs) SetStringOptionValue(opt string, val string) {
@@ -217,51 +423,31 @@ func (h *Highs) GetStringOptionValue(opt string) string {
 	return C.GoString((*C.char)(pVal))
 }
 
-func (h *Highs) Run() error {
-	C.Highs_run(h.obj)
-	return nil
+func (h *Highs) SetBoolOptionValue(opt string, val bool) {
+
+	pOpt := C.CString(opt)
+	defer cFree(unsafe.Pointer(pOpt))
+
+	var v C.int
+	if val == true {
+		v = C.int(1)
+	} else {
+		v = C.int(0)
+	}
+
+	C.Highs_setBoolOptionValue(h.obj, pOpt, v)
 }
 
-type Solution struct {
-	colValue []float64
-	colDual  []float64
-	rowValue []float64
-	rowDual  []float64
-}
+func (h *Highs) GetBoolOptionValue(opt string) bool {
+	pOpt := C.CString(opt)
+	defer cFree(unsafe.Pointer(pOpt))
 
-func NewSolution() Solution {
-	return Solution{[]float64{}, []float64{}, []float64{}, []float64{}}
-}
+	pVal := cMalloc(1, C.int(0))
+	defer cFree(pVal)
 
-func (h *Highs) GetSolution() Solution {
-	pColValue := cMalloc(h.dims.cols, C.double(0))
-	h.allocs = append(h.allocs, pColValue)
+	C.Highs_getBoolOptionValue(h.obj, pOpt, (*C.int)(pVal))
 
-	pColDual := cMalloc(h.dims.cols, C.double(0))
-	h.allocs = append(h.allocs, pColDual)
-
-	pRowValue := cMalloc(h.dims.rows, C.double(0))
-	h.allocs = append(h.allocs, pRowValue)
-
-	pRowDual := cMalloc(h.dims.rows, C.double(0))
-	h.allocs = append(h.allocs, pRowDual)
-
-	C.Highs_getSolution(h.obj, (*C.double)(pColValue), (*C.double)(pColDual), (*C.double)(pRowValue), (*C.double)(pRowDual))
-
-	s := NewSolution()
-	s.colValue = copyDoubles(pColValue, h.dims.cols)
-	cFree(pColValue)
-
-	s.colDual = copyDoubles(pColDual, h.dims.cols)
-	cFree(pColDual)
-
-	s.rowValue = copyDoubles(pRowValue, h.dims.rows)
-	cFree(pRowValue)
-
-	s.rowDual = copyDoubles(pRowDual, h.dims.rows)
-	cFree(pRowDual)
-
-	return s
+	return int(*(*C.int)(pVal)) > 0
 }
 
 type PackedMatrix struct {
@@ -289,6 +475,22 @@ func packMatrix(matrix [][]float64) PackedMatrix {
 	}
 
 	return PackedMatrix{arStart, arIndex, arValue}
+}
+
+// separateBounds splits a bounded rows [lb, row..., ub] into its components lb, rows, ub
+func separateBounds(bound_rows [][]float64) ([][]float64, []float64, []float64) {
+	col_size := len(bound_rows[0])
+
+	rows := [][]float64{}
+	lbs := []float64{}
+	ubs := []float64{}
+	for _, row := range bound_rows {
+		rows = append(rows, row[1:col_size-1])
+		lbs = append(lbs, row[0])
+		ubs = append(ubs, row[col_size-1])
+	}
+
+	return rows, lbs, ubs
 }
 
 // cMalloc asks C to allocate memory.  For convenience to Go, the arguments
@@ -322,6 +524,21 @@ func cSetArrayInt(a unsafe.Pointer, i, v int) {
 	*(*C.int)(ptr) = C.int(v)
 }
 
+func copyInts(a unsafe.Pointer, size int) []int {
+	gs := make([]int, size)
+	for i := range gs {
+		gs[i] = cGetArrayInt(a, i)
+	}
+
+	return gs
+}
+
+func cGetArrayInt(a unsafe.Pointer, i int) int {
+	eSize := unsafe.Sizeof(C.int(0))
+	ptr := unsafe.Pointer(uintptr(a) + uintptr(i)*eSize)
+	return int(*(*C.int)(ptr))
+}
+
 func cSetArrayDoubles(a unsafe.Pointer, vs []float64) {
 	for i, v := range vs {
 		cSetArrayDouble(a, i, v)
@@ -352,50 +569,3 @@ func cGetArrayDouble(a unsafe.Pointer, i int) float64 {
 	ptr := unsafe.Pointer(uintptr(a) + uintptr(i)*eSize)
 	return float64(*(*C.double)(ptr))
 }
-
-/*
-// A Nonzero represents an element in a sparse row or column.
-type Nonzero struct {
-	Index int     // Zero-based element offset
-	Value float64 // Value at that offset
-}
-
-// A Matrix sparsely represents a set of linear expressions.  Each column
-// represents a variable, each row represents an expression, and each cell
-// containing a coefficient. Bounds on rows and columns are applied during
-// model initialization.
-type Matrix interface {
-	AppendColumn(col []Nonzero) // Append a column given values for all of its nonzero elements
-	Dims() (rows, cols int)     // Return the matrix's dimensions
-}
-
-
-// c__GetArrayInt returns a[i] as a Go int where a is a C.int array allocated
-// by cMalloc and i is a Go ints.
-func cGetArrayInt(a unsafe.Pointer, i int) int {
-	eSize := unsafe.Sizeof(C.int(0))
-	ptr := unsafe.Pointer(uintptr(a) + uintptr(i)*eSize)
-	return int(*(*C.int)(ptr))
-}
-
-// copyIntsGoC copies a slice of Go ints to a slice of C ints.
-func copyIntsGoC(cs []C.int, gs []int) {
-	if len(gs) != len(cs) {
-		panic("Slices of different sizes were passed to copyIntsGoC")
-	}
-	for i, g := range gs {
-		cs[i] = C.int(g)
-	}
-}
-
-// copyIntsCGo copies a slice of C ints to a slice of Go ints.
-func copyIntsCGo(gs []int, cs []C.int) {
-	if len(gs) != len(cs) {
-		panic("Slices of different sizes were passed to copyIntsCGo")
-	}
-	for i, c := range cs {
-		gs[i] = int(c)
-	}
-}
-
-*/

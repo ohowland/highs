@@ -1,6 +1,7 @@
 package highs
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,15 +11,22 @@ func BuildExampleMipHighs(t *testing.T) *Highs {
 	h, err := New()
 	assert.NoError(t, err)
 
-	cost := []float64{2.0, 3.0}
-	clb := []float64{0.0, 1.0}
-	cub := []float64{3.0, 1e30}
+	cols := []float64{2.0, 3.0}
+	h.SetColumns(cols)
+	bnds := [][2]float64{{0.0, 3.0}, {1.0, 1e30}}
+	h.SetBounds(bnds)
 
-	err = h.AddColumns(cost, clb, cub)
-	assert.NoError(t, err)
+	rows := [][]float64{
+		{-1e30, 0.0, 1.0, 6.0},
+		{10.0, 1.0, 2.0, 14.0},
+		{8.0, 2.0, 1.0, 1e30}}
 
-	h.SetIntegrality(1, 0)
+	h.SetRows(rows)
 
+	intg := []int{1, 1}
+	h.SetIntegrality(intg)
+
+	h.SetBoolOptionValue("output_flag", true)
 	return h
 }
 
@@ -26,18 +34,17 @@ func BuildExampleHighs(t *testing.T) *Highs {
 	h, err := New()
 	assert.NoError(t, err)
 
-	cost := []float64{2.0, 3.0}
-	clb := []float64{0.0, 1.0}
-	cub := []float64{3.0, 1e30}
+	cols := []float64{2.0, 3.0}
+	h.SetColumns(cols)
+	bnds := [][2]float64{{0.0, 3.0}, {1.0, 1e30}}
+	h.SetBounds(bnds)
 
-	err = h.AddColumns(cost, clb, cub)
-	assert.NoError(t, err)
+	rows := [][]float64{
+		{-1e30, 0.0, 1.0, 6.0},
+		{10.0, 1.0, 2.0, 14.0},
+		{8.0, 2.0, 1.0, 1e30}}
 
-	rows := [][]float64{{0.0, 1.0}, {1.0, 2.0}, {2.0, 1.0}}
-	rlb := []float64{-1e30, 10.0, 8}
-	rub := []float64{6.0, 14.0, 1e30}
-
-	err = h.AddRows(rows, rlb, rub)
+	h.SetRows(rows)
 	assert.NoError(t, err)
 
 	return h
@@ -48,16 +55,24 @@ func TestCreateHighs(t *testing.T) {
 	assert.Nil(t, err, "Error returned when allocating new highs object.")
 }
 
-func TestAddCols(t *testing.T) {
+func TestSetCols(t *testing.T) {
 	h, _ := New()
+	cols := []float64{2.0, 3.0}
+	h.SetColumns(cols)
+	assert.Equal(t, cols, h.cols, "Error returned when adding columns to highs object")
+}
 
-	cost := []float64{2.0, 3.0}
-	lb := []float64{0.0, 1.0}
-	ub := []float64{3.0, 1e30}
+func TestSeparateBounds(t *testing.T) {
+	rows := [][]float64{
+		{-1, 0.0, 1.0, 2.0},
+		{10.0, 1.0, 2.0, 14.0},
+		{8.0, 2.0, 1.0, 20}}
 
-	err := h.AddColumns(cost, lb, ub)
+	rows, lbs, ubs := separateBounds(rows)
 
-	assert.Nil(t, err, "Error returned when adding columns to highs object")
+	assert.Equal(t, []float64{-1, 10, 8}, lbs)
+	assert.Equal(t, []float64{2, 14, 20}, ubs)
+	assert.Equal(t, [][]float64{{0, 1}, {1, 2}, {2, 1}}, rows)
 }
 
 func TestPackRows(t *testing.T) {
@@ -69,62 +84,84 @@ func TestPackRows(t *testing.T) {
 	assert.Equal(t, []float64{1.0, 1.0, 2.0, 2.0, 1.0}, pm.arValue, "malformed decision variable coefficient slice")
 }
 
-func TestAddRowsWithoutCols(t *testing.T) {
+func TestSetRows(t *testing.T) {
 	h, _ := New()
+	rows := [][]float64{
+		{-10e30, 0.0, 1.0, 6.0},
+		{10.0, 1.0, 2.0, 14.0},
+		{8.0, 2.0, 1.0, 1.0e30}}
+	h.SetRows(rows)
 
-	rows := [][]float64{{0.0, 1.0}, {1.0, 2.0}, {2.0, 1.0}}
-	lb := []float64{-10e30, 10.0, 8}
-	ub := []float64{6.0, 14.0, 1.0e30}
-	err := h.AddRows(rows, lb, ub)
-
-	assert.Error(t, err, "No error returned when adding rows to a highs object that contains now columns")
+	assert.Equal(t, rows, h.rows)
 }
 
-func TestAddColsAndRows(t *testing.T) {
+func TestAllocateColumns(t *testing.T) {
 	h, _ := New()
 
-	cost := []float64{2.0, 3.0}
-	lb := []float64{0.0, 1.0}
-	ub := []float64{3.0, 1e30}
+	cols := []float64{2.0, 3.0}
+	h.SetColumns(cols)
+	bnds := [][2]float64{{0.0, 3.0}, {1.0, 1e30}}
+	h.SetBounds(bnds)
 
-	err := h.AddColumns(cost, lb, ub)
-	assert.Nil(t, err, "Error returned when adding columns to highs object")
-
-	rows := [][]float64{{0.0, 1.0}, {1.0, 2.0}, {2.0, 1.0}}
-	lb = []float64{-1e30, 10.0, 8}
-	ub = []float64{6.0, 14.0, 1e30}
-
-	err = h.AddRows(rows, lb, ub)
-	assert.Nil(t, err, "Error returned when adding columns to highs object")
+	h.allocateColumns()
+	assert.Equal(t, cols, (copyDoubles(h.ptrs.pCols, len(h.cols))))
+	assert.Equal(t, h.GetLowerBounds(), (copyDoubles(h.ptrs.pColLbs, len(h.cols))))
+	assert.Equal(t, h.GetUpperBounds(), (copyDoubles(h.ptrs.pColUbs, len(h.cols))))
 }
 
-func TestRun(t *testing.T) {
+func TestAllocateRows(t *testing.T) {
 	h, _ := New()
 
-	cost := []float64{2.0, 3.0}
-	lb := []float64{0.0, 1.0}
-	ub := []float64{3.0, 1e30}
+	cols := []float64{2.0, 3.0}
+	h.SetColumns(cols)
+	bnds := [][2]float64{{0.0, 3.0}, {1.0, 1e30}}
+	h.SetBounds(bnds)
+	h.allocateColumns()
 
-	err := h.AddColumns(cost, lb, ub)
-	assert.Nil(t, err, "Error returned when adding columns to highs object")
+	bounded_rows := [][]float64{
+		{-1e30, 0.0, 1.0, 6.0},
+		{10.0, 1.0, 2.0, 14.0},
+		{8.0, 2.0, 1.0, 1e30}}
 
-	rows := [][]float64{{0.0, 1.0}, {1.0, 2.0}, {2.0, 1.0}}
-	lb = []float64{-1e30, 10.0, 8}
-	ub = []float64{6.0, 14.0, 1e30}
+	h.SetRows(bounded_rows)
+	err := h.allocateRows()
+	assert.NoError(t, err)
 
-	err = h.AddRows(rows, lb, ub)
-	assert.Nil(t, err, "Error returned when adding columns to highs object")
+	r, l, u := separateBounds(bounded_rows)
+	pm := packMatrix(r)
 
-	h.Run()
-	s := h.GetSolution()
-
-	assert.Equal(t, []float64{2, 4}, s.colValue, "unexpected primal solution")
+	assert.Equal(t, pm.arStart, (copyInts(h.ptrs.pArStart, h.ptrs.ArStartSize)), "arStart malformed")
+	assert.Equal(t, pm.arIndex, (copyInts(h.ptrs.pArIndex, h.ptrs.ArIndexSize)), "arIndex malformed")
+	assert.Equal(t, pm.arValue, (copyDoubles(h.ptrs.pArValue, h.ptrs.ArIndexSize)), "arValue malformed")
+	assert.Equal(t, l, (copyDoubles(h.ptrs.pRowLbs, len(h.rows))))
+	assert.Equal(t, u, (copyDoubles(h.ptrs.pRowUbs, len(h.rows))))
 }
 
-// SET option
+func TestRunLpSolver(t *testing.T) {
+	h := BuildExampleHighs(t)
+
+	s, err := h.RunSolver()
+	fmt.Println(s.colValue)
+	assert.NoError(t, err)
+}
+
+func TestRunMipSolver(t *testing.T) {
+	h := BuildExampleMipHighs(t)
+
+	s, err := h.RunSolver()
+	fmt.Println(s.colValue)
+	assert.NoError(t, err)
+}
+
+// SET/GET option
 
 func TestSetBoolOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
+	h, _ := New()
+	h.SetBoolOptionValue("output_flag", true)
+
+	r := h.GetBoolOptionValue("output_flag")
+
+	assert.Equal(t, true, r)
 }
 
 func TestSetIntOptionValue(t *testing.T) {
@@ -136,38 +173,15 @@ func TestSetDoubleOptionValue(t *testing.T) {
 }
 
 func TestSetStringOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
-
-func TestSetOptionValue(t *testing.T) {
 	h, _ := New()
 	opt := "solver"
-	val := "mip"
+	val := "ipm"
 	h.SetStringOptionValue(opt, val)
 
 	r := h.GetStringOptionValue(opt)
 
 	assert.Equal(t, val, r, "value written to option was not returned")
 
-}
-
-// GET option
-
-func TestGetBoolOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
-
-func TestGetIntOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
-
-func TestGetDoubleOptionValue(t *testing.T) {
-	assert.Fail(t, "unimplemented")
-}
-
-func TestGetStringOptionValue(t *testing.T) {
-
-	assert.Fail(t, "unimplemented")
 }
 
 // Objective Sense
@@ -188,9 +202,6 @@ func TestChangeObjectiveSense(t *testing.T) {
 // Integrality
 
 func TestChangeColIntegrality(t *testing.T) {
-	//h := BuildExampleHighs(t)
-	//h.SetIntegrality(0, Discrete)
-	BuildExampleMipHighs(t)
 	assert.Fail(t, "unimplemented")
 }
 
