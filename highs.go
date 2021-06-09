@@ -348,7 +348,7 @@ func (h *Highs) SetBoolOptionValue(opt string, val bool) {
 	defer cFree(unsafe.Pointer(pOpt))
 
 	var v C.int
-	if val == true {
+	if val {
 		v = C.int(1)
 	} else {
 		v = C.int(0)

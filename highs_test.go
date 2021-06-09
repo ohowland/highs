@@ -1,6 +1,7 @@
 package highs
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,11 +9,11 @@ import (
 
 func BuildExampleMipHighs(t *testing.T) *Highs {
 	cols := []float64{2.0, 3.0}
-	bnds := [][2]float64{{0.0, 3.0}, {1.0, 1e30}}
+	bnds := [][2]float64{{0.0, 3.0}, {1.0, math.Inf(1)}}
 	rows := [][]float64{
-		{-1e30, 0.0, 1.0, 6.0},
+		{math.Inf(-1), 0.0, 1.0, 6.0},
 		{10.0, 1.0, 2.0, 14.0},
-		{8.0, 2.0, 1.0, 1e30}}
+		{8.0, 2.0, 1.0, math.Inf(1)}}
 	intg := []int{1, 1}
 
 	h, err := New(cols, bnds, rows, intg)
@@ -23,12 +24,12 @@ func BuildExampleMipHighs(t *testing.T) *Highs {
 
 func BuildExampleHighs(t *testing.T) *Highs {
 	cols := []float64{2.0, 3.0}
-	bnds := [][2]float64{{0.0, 3.0}, {1.0, 1e30}}
+	bnds := [][2]float64{{0.0, 3.0}, {1.0, math.Inf(1)}}
 
 	rows := [][]float64{
-		{-1e30, 0.0, 1.0, 6.0},
+		{math.Inf(-1), 0.0, 1.0, 6.0},
 		{10.0, 1.0, 2.0, 14.0},
-		{8.0, 2.0, 1.0, 1e30}}
+		{8.0, 2.0, 1.0, math.Inf(1)}}
 
 	h, err := New(cols, bnds, rows, []int{})
 	assert.NoError(t, err)
@@ -72,9 +73,9 @@ func TestPackRows(t *testing.T) {
 func TestSetRows(t *testing.T) {
 	h := BuildExampleHighs(t)
 	rows := [][]float64{
-		{-1e30, 0.0, 1.0, 6.0},
+		{math.Inf(-1), 0.0, 1.0, 6.0},
 		{10.0, 1.0, 2.0, 14.0},
-		{8.0, 2.0, 1.0, 1e30}}
+		{8.0, 2.0, 1.0, math.Inf(1)}}
 
 	assert.Equal(t, rows, h.rows)
 }
@@ -96,9 +97,9 @@ func TestAllocateRows(t *testing.T) {
 	h.allocateColumns()
 
 	bounded_rows := [][]float64{
-		{-1e30, 0.0, 1.0, 6.0},
+		{math.Inf(-1), 0.0, 1.0, 6.0},
 		{10.0, 1.0, 2.0, 14.0},
-		{8.0, 2.0, 1.0, 1e30}}
+		{8.0, 2.0, 1.0, math.Inf(1)}}
 
 	err := h.allocateRows()
 	assert.NoError(t, err)
